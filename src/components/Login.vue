@@ -56,6 +56,7 @@ export default {
     },
     login () {
       this.$refs.loginFormRef.validate(async valid => {
+        console.log(valid)
         if (!valid) {
           return false
         }
