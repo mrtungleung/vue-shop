@@ -11,7 +11,7 @@
       <!-- 添加角色按钮区 -->
       <el-row>
         <el-col>
-          <el-button type="primary">添加角色</el-button>
+          <el-button type="primary" @click="addRoleDialogVisible = true">添加角色</el-button>
         </el-col>
       </el-row>
       <!-- 角色列表区域 -->
@@ -56,6 +56,26 @@
         </el-table-column>
       </el-table>
     </el-card>
+    <!-- 添加角色对话框 -->
+    <el-dialog
+      title="添加角色"
+      :visible.sync="addRoleDialogVisible"
+      width="50%"
+      @close="addRoleDialogClosed"
+    >
+      <el-form :model="addForm" :rules="addFormRules" ref="addFormRef" label-width="80px">
+        <el-form-item label="角色名称" prop="roleName">
+          <el-input v-model="addForm.roleName"></el-input>
+        </el-form-item>
+        <el-form-item label="角色描述" prop="roleDesc">
+          <el-input v-model="addForm.roleDesc"></el-input>
+        </el-form-item>
+      </el-form>
+      <span slot="footer" class="dialog-footer">
+        <el-button @click="addRoleDialogVisible = false">取 消</el-button>
+        <el-button type="primary" @click="addRole">确 定</el-button>
+      </span>
+    </el-dialog>
 
     <!-- 分配权限的对话框 -->
     <el-dialog
@@ -96,7 +116,25 @@ export default {
       // 默认选中的节点Id值数组
       defKeys: [],
       // 当前即将分配角色权限的id
-      roleId: ''
+      roleId: '',
+      // 控制添加角色对话框的显示与隐藏
+      addRoleDialogVisible: false,
+      // 添加用户的表单数据
+      addForm: {
+        roleName: '',
+        roleDesc: ''
+      },
+      // 添加表单的验证规则对象
+      addFormRules: {
+        roleName: [
+          { required: true, message: '请输入角色名称', trigger: 'blur' },
+          { min: 3, max: 10, message: '用户名的长度在3~10个字符之间', trigger: 'blur' }
+        ],
+        roleDesc: [
+          { required: true, message: '请输角色描述', trigger: 'blur' },
+          { min: 3, max: 10, message: '用户名的长度在3~10个字符之间', trigger: 'blur' }
+        ]
+      }
     }
   },
   created () {
@@ -175,6 +213,29 @@ export default {
       this.$message.success('分配权限成功！')
       await this.getRolesList()
       this.setRightDialogVisible = false
+    },
+    // 点击按钮，添加新角色
+    addRole () {
+      this.$refs.addFormRef.validate(async valid => {
+        console.log(valid)
+        if (!valid) {
+          return false
+        }
+        // 可以发起添加新角色的网络请求
+        const { data: res } = await this.$http.post('roles', this.addForm)
+        if (res.meta.status !== 201) {
+          return this.$message.error('添加角色失败！')
+        }
+        this.$message.success('添加角色成功')
+        // 隐藏添加的对话框
+        this.addRoleDialogVisible = false
+        // 重新获取角色列表数据
+        await this.getRolesList()
+      })
+    },
+    // 关闭添加角色对话框
+    addRoleDialogClosed () {
+      this.$refs.addFormRef.resetFields()
     }
   }
 }
