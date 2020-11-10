@@ -108,7 +108,7 @@ export default {
   height: 100%;
 }
 .el-header {
-  background: #409EFF;
+  background: pink;
   display: flex;
   justify-content: space-between;
   padding-left: 0;
