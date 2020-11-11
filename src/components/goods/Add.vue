@@ -41,7 +41,7 @@
             <el-form-item label="商品数量" prop="goods_number">
               <el-input v-model="addForm.goods_number" type="number"></el-input>
             </el-form-item>
-            <el-form-item label="商品分类" prop="">
+            <el-form-item label="商品分类" prop="goods_cat">
               <el-cascader
                 v-model="addForm.goods_cat"
                 :options="catList"
@@ -80,7 +80,7 @@
             <quill-editor  v-model="addForm.goods_introduce">
             </quill-editor>
             <!-- 添加商品的按钮 -->
-            <el-button type="primary" class="btnAdd">添加商品</el-button>
+            <el-button type="primary" class="btnAdd" @click="add">添加商品</el-button>
           </el-tab-pane>
         </el-tabs>
       </el-form>
@@ -97,6 +97,8 @@
 </template>
 
 <script>
+import _ from 'lodash'
+
 export default {
   name: 'Add',
   data () {
@@ -113,7 +115,8 @@ export default {
         // 图片的数组
         pics: [],
         // 商品详情描述
-        goods_introduce: ''
+        goods_introduce: '',
+        attrs: []
       },
       addFormRules: {
         goods_name: [
@@ -127,6 +130,9 @@ export default {
         ],
         goods_number: [
           { required: true, message: '请输入商品数量', trigger: 'blur' }
+        ],
+        goods_cat: [
+          { required: true }
         ]
       },
       // 商品分类列表
@@ -224,6 +230,40 @@ export default {
       const picInfo = { pic: response.data.tmp_path }
       this.addForm.pics.push(picInfo)
       console.log(this.addForm)
+    },
+    add () {
+      // console.log(this.addForm)
+      this.$refs.addFormRef.validate(async valid => {
+        if (!valid) {
+          return this.$message.error('请填写必要的表单项目！')
+        }
+        // 处理动态参数、静态属性
+        this.manyTableData.forEach(item => {
+          const newInfo = {
+            attr_id: item.attr_id,
+            attr_value: item.attr_vals.join(' ')
+          }
+          this.addForm.attrs.push(newInfo)
+        })
+        this.onlyTableData.forEach(item => {
+          const newInfo = {
+            attr_id: item.attr_id,
+            attr_value: item.attr_vals
+          }
+          this.addForm.attrs.push(newInfo)
+        })
+        // lodash cloneDeep(obj)
+        const form = _.cloneDeep(this.addForm)
+        form.goods_cat = form.goods_cat.join(',')
+        // 发起请求，添加商品
+        const { data: res } = await this.$http.post('goods', form)
+        console.log(res)
+        if (res.meta.status !== 201) {
+          return this.$message.error('添加商品失败！')
+        }
+        this.$message.success('添加商品成功！')
+        await this.$router.push('/goods')
+      })
     }
   },
   computed: {
