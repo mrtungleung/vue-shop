@@ -27,7 +27,7 @@
       </el-steps>
       <!-- tab栏区域 -->
       <el-form :model="addForm" :rules="addFormRules" ref="addFormRef" label-width="100px" label-position="top">
-        <el-tabs v-model="activeIndex" :tab-position="'left'">
+        <el-tabs v-model="activeIndex" :tab-position="'left'" :before-leave="beforeTabLeave" @tab-click="tabClicked">
           <el-tab-pane label="基础信息" name="0">
             <el-form-item label="商品名称" prop="goods_name">
               <el-input v-model="addForm.goods_name"></el-input>
@@ -50,13 +50,49 @@
               </el-cascader>
             </el-form-item>
           </el-tab-pane>
-          <el-tab-pane label="商品参数" name="1">商品参数</el-tab-pane>
-          <el-tab-pane label="商品属性" name="2">商品属性</el-tab-pane>
-          <el-tab-pane label="商品图片" name="3">商品图片</el-tab-pane>
-          <el-tab-pane label="商品内容" name="4">商品内容</el-tab-pane>
+          <el-tab-pane label="商品参数" name="1">
+            <!-- 渲染表单的Item项-->
+            <el-form-item :label="item.attr_name" v-for="item in manyTableData" :key="item.attr_id">
+              <!-- 复选框组 -->
+              <el-checkbox-group v-model="item.attr_vals">
+                <el-checkbox :label="cb" v-for="(cb, i) in item.attr_vals" :key="i" border size="mini"></el-checkbox>
+              </el-checkbox-group>
+            </el-form-item>
+          </el-tab-pane>
+          <el-tab-pane label="商品属性" name="2">
+            <el-form-item :label="item.attr_name" v-for="item in onlyTableData" :key="item.attr_id">
+              <el-input v-model="item.attr_vals"></el-input>
+            </el-form-item>
+          </el-tab-pane>
+          <el-tab-pane label="商品图片" name="3">
+            <!-- action上传图片的后台url地址-->
+            <el-upload
+              :action="uploadURL"
+              :on-preview="handlePreview"
+              :on-remove="handleRemove"
+              list-type="picture"
+              :headers="headerObj"
+              :on-success="handleSuccess">
+              <el-button size="small" type="primary">点击上传</el-button>
+            </el-upload>
+          </el-tab-pane>
+          <el-tab-pane label="商品内容" name="4">
+            <quill-editor  v-model="addForm.goods_introduce">
+            </quill-editor>
+            <!-- 添加商品的按钮 -->
+            <el-button type="primary" class="btnAdd">添加商品</el-button>
+          </el-tab-pane>
         </el-tabs>
       </el-form>
     </el-card>
+    <!-- 图片预览 -->
+    <el-dialog
+      title="图片预览"
+      :visible.sync="previewVisible"
+      width="50%"
+      >
+      <img :src="previewPath" alt="图片" class="previewImg"/>
+    </el-dialog>
   </div>
 </template>
 
@@ -72,7 +108,12 @@ export default {
         goods_price: 0,
         goods_weight: 0,
         goods_number: 0,
-        goods_cat: []
+        // 商品所属分类数组
+        goods_cat: [],
+        // 图片的数组
+        pics: [],
+        // 商品详情描述
+        goods_introduce: ''
       },
       addFormRules: {
         goods_name: [
@@ -95,7 +136,18 @@ export default {
         label: 'cat_name',
         value: 'cat_id',
         children: 'children'
-      }
+      },
+      // 动态参数列表数据
+      manyTableData: [],
+      // 静态属性列表数据
+      onlyTableData: [],
+      uploadURL: 'https://www.liulongbin.top:8888/api/private/v1/upload',
+      // 图片上传组件的headers请求头对象
+      headerObj: {
+        Authorization: window.sessionStorage.getItem('token')
+      },
+      previewPath: '',
+      previewVisible: false
     }
   },
   created () {
@@ -113,11 +165,86 @@ export default {
     // 级联选择器选中项变化，会触发这个函数
     handleChange () {
       console.log(this.addForm.goods_cat)
+      if (this.addForm.goods_cat.length !== 3) {
+        this.addForm.goods_cat = []
+      }
+    },
+    beforeTabLeave (activeName, oldActiveName) {
+      /* console.log('即将离开的标签页名字' + oldActiveName)
+      console.log('即将进入的标签页名字' + activeName)
+      return false */
+      if (oldActiveName === '0' && this.addForm.goods_cat.length !== 3) {
+        this.$message.error('请先选择商品分类！')
+        return false
+      }
+    },
+    async tabClicked () {
+      // console.log(this.activeIndex)
+      // 证明访问的是动态参数面板
+      if (this.activeIndex === '1') {
+        const { data: res } = await this.$http.get(`categories/${this.cateId}/attributes`,
+          { params: { sel: 'many' } })
+        if (res.meta.status !== 200) {
+          return this.$message.error('获取动态参数失败！')
+        }
+        console.log(res.data)
+        res.data.forEach(item => {
+          item.attr_vals = item.attr_vals.length === 0 ? [] : item.attr_vals.split(' ')
+        })
+        this.manyTableData = res.data
+      } else if (this.activeIndex === '2') {
+        const { data: res } = await this.$http.get(`categories/${this.cateId}/attributes`,
+          { params: { sel: 'only' } })
+        if (res.meta.status !== 200) {
+          return this.$message.error('获取静态参数失败！')
+        }
+        console.log(res.data)
+        this.onlyTableData = res.data
+      }
+    },
+    // 处理图片预览操作
+    handlePreview (file) {
+      console.log(file)
+      this.previewPath = file.response.data.url
+      this.previewVisible = true
+    },
+    // 处理移除图片的操作
+    handleRemove (file) {
+      // 获取将要删除图片的临时路径
+      const filePath = file.response.data.tmp_path
+      // 从pics数组找到这个图片对应的索引
+      const i = this.addForm.pics.findIndex(x => x.pic === filePath)
+      // 删除图片
+      this.addForm.pics.splice(i, 1)
+      console.log(this.addForm)
+    },
+    // 监听图片上传成功的事件
+    handleSuccess (response) {
+      console.log(response)
+      const picInfo = { pic: response.data.tmp_path }
+      this.addForm.pics.push(picInfo)
+      console.log(this.addForm)
+    }
+  },
+  computed: {
+    cateId () {
+      if (this.addForm.goods_cat.length === 3) {
+        return this.addForm.goods_cat[2]
+      }
+      return null
     }
   }
 }
 </script>
 
 <style scoped>
-
+.el-checkbox {
+  margin: 5px;
+}
+.previewImg {
+  width: 100%;
+}
+.btnAdd {
+  margin-top: 15px;
+}
 </style>

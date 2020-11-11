@@ -14,6 +14,13 @@ import ZkTable from 'vue-table-with-tree-grid'
 import NProgress from 'nprogress'
 import 'nprogress/nprogress.css'
 
+// 引入富文本编译器
+import VueQuillEditor from 'vue-quill-editor'
+import 'quill/dist/quill.core.css'
+import 'quill/dist/quill.snow.css'
+import 'quill/dist/quill.bubble.css'
+Vue.use(VueQuillEditor)
+
 Vue.component('tree-table', ZkTable)
 
 // 配置请求根路径
